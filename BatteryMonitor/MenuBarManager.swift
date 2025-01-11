@@ -193,57 +193,41 @@ class MenuBarManager {
         
         let batteryInfo = getBatteryInfo()
         
-        // Debug print raw values
-        print("Raw Battery Info:", batteryInfo)
-        
-        // Extract values safely with explicit temperature handling
+        // Extract values safely
         let designCapacity = batteryInfo["DesignCapacity"] as? Int ?? 1
         let maxCapacity = batteryInfo["MaxCapacity"] as? Int ?? 1
         let currentCapacity = batteryInfo["CurrentCapacity"] as? Int ?? 0
         let cycleCount = batteryInfo["CycleCount"] as? Int ?? 0
+        let appleRawCurrentCapacity = batteryInfo["AppleRawCurrentCapacity"] as? Int ?? 0
+        let appleRawMaxCapacity = batteryInfo["AppleRawMaxCapacity"] as? Int ?? 0
         
-        // Explicitly handle temperature conversion
+        // Calculate percentages correctly
+        let healthPercentage = (Double(appleRawMaxCapacity) / Double(designCapacity)) * 100
+        let currentPercentage = Double(currentCapacity)  // CurrentCapacity is already a percentage
+        
+        // Temperature and other values...
         let rawTemp = batteryInfo["Temperature"] as? Int ?? 0
         let temperatureCelsius = Double(rawTemp) / 100.0
         let temperatureString = String(format: "%.1f°C", temperatureCelsius)
-        
-        print("\nTemperature Processing:")
-        print("Raw Temperature: \(rawTemp)")
-        print("Converted Temperature: \(temperatureCelsius)")
-        print("Temperature String: '\(temperatureString)'")
         
         let voltage = Double(batteryInfo["Voltage"] as? Int ?? 0) / 1000.0
         let amperage = Double(batteryInfo["Amperage"] as? Int ?? 0) / 1000.0
         let isCharging = batteryInfo[kIOPSIsChargingKey] as? Bool ?? false
         let serialNumber = batteryInfo["BatterySerialNumber"] as? String ?? "--"
         
-        // Calculate health and percentages using the correct values
-        let healthPercentage = (Double(maxCapacity) / Double(designCapacity)) * 100
-        let capacityPercentage = Double(currentCapacity) / Double(maxCapacity) * 100
         let condition = getBatteryCondition(health: healthPercentage)
         let timeRemaining = getTimeRemaining(from: batteryInfo, isCharging: isCharging)
-        
-        print("\nStatus Bar Update Debug:")
-        print("Current Capacity: \(currentCapacity)")
-        print("Max Capacity: \(maxCapacity)")
-        print("Calculated Percentage: \(capacityPercentage)%")
-        print("Is Charging: \(isCharging)")
-        
-        print("\nVerifying menu items before updates:")
-          for (index, item) in menu.items.enumerated() {
-              print("Item \(index): '\(item.attributedTitle?.string ?? item.title)'")
-          }
-          
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
+            // Update menu items
             self.updateMenuItem(menu, index: 0, value: "\(designCapacity) mAh\t100 %")
-            self.updateMenuItem(menu, index: 1, value: "\(currentCapacity) mAh\t\(Int(capacityPercentage)) %")
+            self.updateMenuItem(menu, index: 1, value: "\(appleRawMaxCapacity) mAh\t\(Int(healthPercentage)) %")
             self.updateMenuItem(menu, index: 2, value: condition)
             self.updateMenuItem(menu, index: 3, value: "\(cycleCount)")
             // Index 4 is separator
-            self.updateMenuItem(menu, index: 5, value: temperatureString)  // Keep as 6 for temperature
+            self.updateMenuItem(menu, index: 5, value: temperatureString)
             self.updateMenuItem(menu, index: 6, value: timeRemaining)
             self.updateMenuItem(menu, index: 7, value: serialNumber)
             // Index 8 is separator
@@ -253,26 +237,14 @@ class MenuBarManager {
             self.updateMenuItem(menu, index: 12, value: String(format: "%.2f V", voltage))
             self.updateMenuItem(menu, index: 13, value: String(format: "%.2f W", abs(voltage * amperage)))
             
-            // Update status bar with correct percentage and symbol
-            let batterySymbol = self.getBatterySymbol(level: capacityPercentage / 100, isCharging: isCharging)
-            let statusText = "\(batterySymbol) \(Int(round(capacityPercentage)))%"
-            
-            print("Setting status bar text: '\(statusText)'")
+            // Update status bar
+            let batterySymbol = self.getBatterySymbol(level: currentPercentage / 100, isCharging: isCharging)
+            let statusText = "\(batterySymbol) \(Int(round(currentPercentage)))%"
             
             if let button = self.statusItem.button {
-                // Set a minimum width for the status item
                 self.statusItem.length = 70
                 button.title = statusText
-            } else {
-                print("Warning: Status item button is nil")
             }
-            
-            // Debug verification
-            print("\nFinal Status:")
-            print("Menu Items Updated: \(menu.items.count)")
-            print("Status Bar Text: '\(statusText)'")
-            print("Battery Level: \(Int(round(capacityPercentage)))%")
-            print("Temperature: \(temperatureString)")
         }
     }
     
@@ -304,7 +276,7 @@ class MenuBarManager {
               let batteryProps = props?.takeRetainedValue() as? [String: Any] else {
             return [:]
         }
-        
+
         // Map battery properties using the correct keys
         var batteryInfo: [String: Any] = [:]
         
@@ -319,7 +291,9 @@ class MenuBarManager {
             ("Amperage", "Amperage"),
             ("BatterySerialNumber", "BatterySerialNumber"),
             ("IsCharging", kIOPSIsChargingKey),
-            ("TimeRemaining", "TimeRemaining")
+            ("TimeRemaining", "TimeRemaining"),
+            ("AppleRawMaxCapacity", "AppleRawMaxCapacity"),
+            ("AppleRawCurrentCapacity", "AppleRawCurrentCapacity")
         ]
         
         // Copy properties with debug logging
