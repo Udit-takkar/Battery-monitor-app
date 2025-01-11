@@ -30,23 +30,31 @@ jobs:
           security set-keychain-settings -t 3600 -u build.keychain
 
           # Import certificate
-          echo $BUILD_CERTIFICATE_BASE64 | base64 --decode > certificate.p12
+          echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
           security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
+          # Verify certificate import
+          security find-identity -v -p codesigning build.keychain
+
       - name: Build App
         run: |
+          CERTIFICATE_ID=$(security find-identity -v -p codesigning build.keychain | grep "Mac Development" | head -1 | awk '{print $2}')
           xcodebuild -project BatteryMonitor.xcodeproj \
             -scheme BatteryMonitor \
             -configuration Release \
-            -derivedDataPath build
+            -derivedDataPath build \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="$CERTIFICATE_ID" \
+            OTHER_CODE_SIGN_FLAGS="--keychain build.keychain"
 
       - name: Create DMG
         run: |
           cd build/Build/Products/Release/
-          codesign --force --deep --sign - BatteryMonitor.app
+          CERTIFICATE_ID=$(security find-identity -v -p codesigning build.keychain | grep "Mac Development" | head -1 | awk '{print $2}')
+          codesign --force --deep --sign "$CERTIFICATE_ID" --keychain build.keychain BatteryMonitor.app
           hdiutil create -volname "Battery Monitor" -srcfolder BatteryMonitor.app -ov -format UDZO BatteryMonitor.dmg
-          codesign --force --sign - BatteryMonitor.dmg
+          codesign --force --sign "$CERTIFICATE_ID" --keychain build.keychain BatteryMonitor.dmg
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
