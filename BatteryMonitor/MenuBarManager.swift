@@ -396,7 +396,6 @@ class MenuBarManager {
     }
 }
 
-
 // Array safe subscript extension
 extension Array {
     subscript(safe index: Index) -> Element? {
