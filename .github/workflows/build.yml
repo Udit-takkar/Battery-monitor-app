@@ -22,13 +22,7 @@ jobs:
           xcodebuild -project BatteryMonitor.xcodeproj \
             -scheme BatteryMonitor \
             -configuration Release \
-            -archivePath $PWD/build/BatteryMonitor.xcarchive \
-            archive
-
-          xcodebuild -exportArchive \
-            -archivePath $PWD/build/BatteryMonitor.xcarchive \
-            -exportOptionsPlist ExportOptions.plist \
-            -exportPath $PWD/build
+            -derivedDataPath build
 
       - name: Create DMG
         run: |
@@ -37,17 +31,12 @@ jobs:
             --volname "Battery Monitor" \
             --window-pos 200 120 \
             --window-size 800 400 \
-            --icon-size 100 \
-            --icon "BatteryMonitor.app" 200 190 \
-            --hide-extension "BatteryMonitor.app" \
-            --app-drop-link 600 185 \
             "BatteryMonitor.dmg" \
-            "build/BatteryMonitor.app"
+            "build/Build/Products/Release/BatteryMonitor.app"
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            BatteryMonitor.dmg
+          files: BatteryMonitor.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
