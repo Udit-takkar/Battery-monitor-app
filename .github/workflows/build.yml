@@ -30,12 +30,15 @@ jobs:
       - name: Create DMG
         run: |
           npm install -g create-dmg
+          ls -la build/Build/Products/Release/
           create-dmg \
             --volname "Battery Monitor" \
             --window-pos 200 120 \
             --window-size 800 400 \
+            --app-drop-link 600 185 \
+            --background-color 0xFFFFFF \
             "BatteryMonitor.dmg" \
-            "build/Build/Products/Release/BatteryMonitor.app"
+            "build/Build/Products/Release/BatteryMonitor.app" || exit 1
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
