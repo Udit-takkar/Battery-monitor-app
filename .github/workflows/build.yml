@@ -2,10 +2,8 @@ name: Build and Release
 
 on:
   push:
-    branches:
-      - main # Run on every push to main branch
     tags:
-      - "v*" # Also run on version tags if you want releases
+      - "v*"
 
 jobs:
   build:
