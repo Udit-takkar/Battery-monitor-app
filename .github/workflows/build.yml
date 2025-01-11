@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    env:
+      KEYCHAIN_PATH: build.keychain
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v2
@@ -21,40 +24,55 @@ jobs:
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           # Create keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security default-keychain -s $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -t 3600 -u $KEYCHAIN_PATH
 
           # Import certificate
           echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
-          security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security import certificate.p12 -k $KEYCHAIN_PATH -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
           # Verify certificate import
-          security find-identity -v -p codesigning build.keychain
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
 
       - name: Build App
         run: |
-          CERTIFICATE_ID=$(security find-identity -v -p codesigning build.keychain | grep "Mac Development" | head -1 | awk '{print $2}')
+          # Unlock keychain again
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          CERTIFICATE_ID=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Mac Development" | head -1 | awk '{print $2}')
+          echo "Using certificate: $CERTIFICATE_ID"
+
           xcodebuild -project BatteryMonitor.xcodeproj \
             -scheme BatteryMonitor \
             -configuration Release \
             -derivedDataPath build \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="$CERTIFICATE_ID" \
-            OTHER_CODE_SIGN_FLAGS="--keychain build.keychain"
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH"
 
       - name: Create DMG
         run: |
+          # Unlock keychain again
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
           cd build/Build/Products/Release/
-          CERTIFICATE_ID=$(security find-identity -v -p codesigning build.keychain | grep "Mac Development" | head -1 | awk '{print $2}')
-          codesign --force --deep --sign "$CERTIFICATE_ID" --keychain build.keychain BatteryMonitor.app
+
+          # Debug: List certificates
+          echo "Available certificates:"
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
+
+          CERTIFICATE_ID=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Mac Development" | head -1 | awk '{print $2}')
+          echo "Using certificate: $CERTIFICATE_ID"
+
+          # Sign app and create DMG
+          codesign --force --deep --sign "$CERTIFICATE_ID" --keychain $KEYCHAIN_PATH BatteryMonitor.app
           hdiutil create -volname "Battery Monitor" -srcfolder BatteryMonitor.app -ov -format UDZO BatteryMonitor.dmg
-          codesign --force --sign "$CERTIFICATE_ID" --keychain build.keychain BatteryMonitor.dmg
+          codesign --force --sign "$CERTIFICATE_ID" --keychain $KEYCHAIN_PATH BatteryMonitor.dmg
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
