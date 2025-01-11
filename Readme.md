@@ -1,10 +1,13 @@
 # Battery Monitor for macOS
 
-A sleek utility that monitors your MacBook's battery status directly from the menu bar.
+A sleek utility that monitors your MacBook's battery status directly from the menu bar, helping you maintain optimal battery health.
 
 ## Features
 
 - Real-time battery monitoring
+- Smart battery health notifications:
+  - Alerts when battery charge exceeds 80% to prevent overcharging
+  - Reminders to plug in when battery falls below 20%
 - Detailed battery information
 - Menu bar integration
 - Power usage statistics
