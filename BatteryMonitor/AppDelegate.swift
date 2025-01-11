@@ -6,7 +6,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var batteryMonitor: BatteryMonitor?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Initialize battery monitor
+        // Initialize battery monitor and start it immediately
         batteryMonitor = BatteryMonitor()
         batteryMonitor?.startMonitoring()
         
@@ -16,7 +16,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup notifications
         NotificationManager.shared.setupNotifications()
         
-        // Enable launch at login
+        // Enable launch at login for future launches
         LaunchAtLogin.enable()
+        
+        // Start monitoring immediately
+        batteryMonitor?.updateBatteryStatus()
+    }
+    
+    // Add this method to ensure the app stays running
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        return true
     }
 }

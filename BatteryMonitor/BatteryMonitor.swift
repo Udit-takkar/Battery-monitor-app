@@ -21,13 +21,17 @@ class BatteryMonitor: ObservableObject {
     private let cycleCountKey = "cycleCount" // IOKit key for cycle count
     
     func startMonitoring() {
+        // Update immediately before starting the timer
+        updateBatteryStatus()
+        
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             self?.updateBatteryStatus()
         }
-        updateBatteryStatus()
+        // Make sure the timer starts running immediately
+        timer?.fire()
     }
     
-    private func updateBatteryStatus() {
+    func updateBatteryStatus() {
         // Get IOKit battery info
         let smartBattery = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSmartBattery"))
         guard smartBattery != IO_OBJECT_NULL else {
