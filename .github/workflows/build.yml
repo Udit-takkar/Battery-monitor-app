@@ -25,27 +25,37 @@ jobs:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
         run: |
+          # Debug: Show current directory
+          pwd
+
           # Create keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security default-keychain -s $KEYCHAIN_PATH
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -t 3600 -u $KEYCHAIN_PATH
 
-          # Import certificate
+          # Debug: Decode certificate and check if it exists
           echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
-          security import certificate.p12 -k $KEYCHAIN_PATH -P "$P12_PASSWORD" -T /usr/bin/codesign
+          ls -la certificate.p12
+
+          # Import certificate with verbose output
+          security import certificate.p12 -k $KEYCHAIN_PATH -P "$P12_PASSWORD" -T /usr/bin/codesign -v
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
-          # Verify certificate import
+          # Debug: List all keychains and identities
+          security list-keychains
+          echo "Identities in keychain:"
           security find-identity -v -p codesigning $KEYCHAIN_PATH
 
       - name: Build App
         run: |
-          # Unlock keychain again
+          # Unlock and verify keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
 
+          # Get certificate ID with debug output
           CERTIFICATE_ID=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Mac Development" | head -1 | awk '{print $2}')
-          echo "Using certificate: $CERTIFICATE_ID"
+          echo "Certificate ID: $CERTIFICATE_ID"
 
           xcodebuild -project BatteryMonitor.xcodeproj \
             -scheme BatteryMonitor \
@@ -57,19 +67,22 @@ jobs:
 
       - name: Create DMG
         run: |
-          # Unlock keychain again
+          # Debug: Show current directory and keychain status
+          pwd
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
 
           cd build/Build/Products/Release/
 
-          # Debug: List certificates
-          echo "Available certificates:"
-          security find-identity -v -p codesigning $KEYCHAIN_PATH
-
+          # Use hardcoded "-" for ad-hoc signing if no certificate is found
           CERTIFICATE_ID=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Mac Development" | head -1 | awk '{print $2}')
+          if [ -z "$CERTIFICATE_ID" ]; then
+            echo "No certificate found, using ad-hoc signing"
+            CERTIFICATE_ID="-"
+          fi
           echo "Using certificate: $CERTIFICATE_ID"
 
-          # Sign app and create DMG
+          # Sign and create DMG
           codesign --force --deep --sign "$CERTIFICATE_ID" --keychain $KEYCHAIN_PATH BatteryMonitor.app
           hdiutil create -volname "Battery Monitor" -srcfolder BatteryMonitor.app -ov -format UDZO BatteryMonitor.dmg
           codesign --force --sign "$CERTIFICATE_ID" --keychain $KEYCHAIN_PATH BatteryMonitor.dmg
