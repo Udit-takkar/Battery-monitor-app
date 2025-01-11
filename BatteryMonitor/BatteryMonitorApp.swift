@@ -15,5 +15,12 @@ struct BatteryMonitorApp: App {
         Settings {
             EmptyView()
         }
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Quit Battery Monitor") {
+                    NSApplication.shared.terminate(nil)
+                }.keyboardShortcut("q")
+            }
+        }
     }
 }
