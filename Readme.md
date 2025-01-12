@@ -2,6 +2,8 @@
 
 A sleek utility that monitors your MacBook's battery status directly from the menu bar, helping you maintain optimal battery health.
 
+Macbook uses Li-Ion battery and keeping it plugged in 24/7 is actually terrible for the battery, which last much longer when kept between 20% and 80% charge.
+
 ## Features
 
 - Real-time battery monitoring
